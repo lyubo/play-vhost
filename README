@@ -1,0 +1,60 @@
+Description
+-----------
+play-vhost module adds ability to write applications which can serve content based
+on HTTP/1.1 Host header field. Separate data source is maintained for each virtual host.
+Also all static resource requests are intercepted and per-host content is served if one exists.
+Configuration of name servers' A/CNAME records is not handled by the module.
+
+Configuration
+-------------
+1. Install the vhost module
+2. add 'module.vhost=${play.path}/modules/vhost' in application.conf file 
+3. Create or modify conf/play.plgins file and put a line for activating plugin (XX:play.modules.vhost.VirtualHostsPlugin)
+4. Create virtual host configuration files. By default these files reside in "conf" directory.
+   You can specify another location by setting "virtualhosts.dir" parameter in conf/application.conf
+   File name must have ".vhost" extension.
+
+configuration file is a text file. It can hold the following parameters:   
+
+home={absolute-path}
+Mandatory. This is virtual host home directory. It is used for distinguishing virtual hosts,
+i.e. you cannot define two or more virtual hosts with the same home.
+You can use this location to store virtual host private files.
+This attribute is accessible by VirtualHost.getHomeDir() method. 
+
+title={absolute-path}
+Optional. If not set, the first fqdn is returned as title. Accessible trough VirtualHost.getTitle() method. 
+ 
+Example: home=/var/play-vhosts/vhost1
+
+db.url={jdbc-data-source}
+Optional. Defines private virtual host JDBC data source. You have to omit "jdbc:" prefix.
+
+Example: db.url=mysql://localhost/vhost1?useUnicode=true&characterEncoding=UTF-8
+
+db.user={db-user}
+Optional. Username to be used when connecting to the data source defined with db.url
+
+db.password={password
+Optional. Password to be used when connecting to the data source defined with db.url
+
+fqdns={comma-separated-list}
+Mandatory. A list with virtual host's fully qualified domain names.
+
+Example: fqdns=vhost1,localhost
+
+Note:
+You have to make appropriate changes in your dns servers, responsible for domains hosted in your application
+Alternatively (which of course will work locally only) you can modify your os' hosts file.
+
+Usage
+-----
+In any controller you can call static method VirtualHost.getCurrent(). If virtual host is defined a VirtualHost object is returned 
+You can invoke its getDataSource() to get virtualhost's private data source.
+
+
+Note:
+-----
+This module uses external library (JNotify) for notification of file changes in order to update virtual host configurations dynamically.
+It is a multi-platform library, currently running on  both linux and ms windows. You have to setup java.library.path variable to point to
+libary's binary files. If the module cannot load these library files it will still work but dynamic updates will be disabled.
