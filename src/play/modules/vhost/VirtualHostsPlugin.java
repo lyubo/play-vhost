@@ -10,14 +10,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.sql.DataSource;
+
 import net.contentobjects.jnotify.JNotify;
 import net.contentobjects.jnotify.JNotifyListener;
 import play.Logger;
 import play.Play;
 import play.PlayPlugin;
 import play.libs.MimeTypes;
+import play.mvc.Http;
 import play.mvc.Http.Request;
 import play.mvc.Http.Response;
+import play.mvc.results.NotFound;
 import play.utils.Properties;
 import play.vfs.VirtualFile;
 
@@ -25,7 +29,7 @@ import com.mchange.v2.c3p0.ComboPooledDataSource;
 
 public class VirtualHostsPlugin extends PlayPlugin
 {
-  private static VirtualHostsPlugin config          = null;
+  private static VirtualHostsPlugin config               = null;
 
   private String                    configDir            = null;
   private Integer                   notificationWatch;
@@ -36,17 +40,6 @@ public class VirtualHostsPlugin extends PlayPlugin
   public static boolean isEnabled()
   {
     return config != null;
-  }
-
-  static VirtualHost findHost(String domain)
-  {
-    return config != null ? config.fqdnMap.get(domain) : null;
-  }
-
-  static VirtualHost[] getAllHosts()
-  {
-    final VirtualHost[] empty = {};
-    return config != null ? config.fqdnMap.values().toArray(empty) : empty;
   }
 
   public VirtualHostsPlugin()
@@ -127,17 +120,38 @@ public class VirtualHostsPlugin extends PlayPlugin
   @Override
   public boolean serveStatic(VirtualFile file, Request request, Response response)
   {
-    VirtualHost host = VirtualHost.find(request.domain);
+    VirtualHost host = findHost(request.domain);
     if (host == null) return false;
+    
+    String publicDir = host.getConfigProperty("publicDir",null);
+    if (publicDir == null) return false;
+    
     String f = file.relativePath();
     if (f.startsWith("{")) f = f.substring(f.indexOf('}') + 1);
-    VirtualFile vfile = VirtualFile.open(host.getHomeDir()).child(f);
+    VirtualFile vfile = VirtualFile.open(publicDir).child(f);
     if (!vfile.exists()) return false;
 
     response.contentType = MimeTypes.getContentType(vfile.getName());
     response.status = 200;
     response.direct = vfile.getRealFile();
     return true;
+  }
+
+  @Override
+  public void beforeInvocation()
+  {
+    if (!VirtualHostsPlugin.isEnabled()) return;
+    Request currentRequest = Http.Request.current();
+    VirtualHost host = findHost(currentRequest.domain) ;
+    if (host == null) throw new NotFound("");
+
+    currentRequest.args.putAll(host.config);
+
+    Map<String, DataSource> dataSources = new HashMap<String, DataSource>();
+    if (host.getDataSource() != null) {
+      dataSources.put(host.getName(), host.getDataSource());
+    }
+    currentRequest.args.put("dataSources", dataSources);
   }
 
   @Override
@@ -152,6 +166,17 @@ public class VirtualHostsPlugin extends PlayPlugin
         Logger.error(t.getMessage());
       }
     }
+  }
+
+  static VirtualHost findHost(String domain)
+  {
+    return config != null ? config.fqdnMap.get(domain) : null;
+  }
+
+  static VirtualHost[] getAllHosts()
+  {
+    final VirtualHost[] empty = {};
+    return config != null ? config.fqdnMap.values().toArray(empty) : empty;
   }
 
   private void loadVirtualHostRegistrations(String pConfigDir)
@@ -202,22 +227,20 @@ public class VirtualHostsPlugin extends PlayPlugin
     // Add new registration (if there is new)
     if (vHostConfig.size() == 0) return;
 
-    String home = (String) vHostConfig.get("home", null);
-    if (home == null) {
-      Logger.error("Virtual host must have home directory specified. Ignoring registration file '%s'", vHostFilename);
+    final List<String> fqdnList = new ArrayList<String>();
+    final String[] fqdns = ((String) vHostConfig.get("fqdns", "")).split(",");
+    if (fqdns.length == 0) {
+      Logger.error("No fqdns set for this virtual host. Ignoring registration file '%s'", vHostFilename);
       return;
     }
-    if (!home.startsWith("/")) home= Play.getFile(home).getAbsolutePath();
-
-    final List<String> fqdns = new ArrayList<String>();
-    for (String fqdn : ((String) vHostConfig.get("fqdns", "")).split(",")) {
+    for (String fqdn : fqdns) {
       if (fqdnMap.containsKey(fqdn)) {
         Logger.warn("'%s' is already in use by another virtual host. FQDN registration skipped.", fqdn);
       } else {
-        fqdns.add(fqdn);
+        fqdnList.add(fqdn);
       }
     }
-    if (fqdns.size() == 0) {
+    if (fqdnList.size() == 0) {
       Logger.error("All fqdns for this virtual host are aleady registered. Ignoring registration file '%s'", vHostFilename);
       return;
     }
@@ -226,7 +249,7 @@ public class VirtualHostsPlugin extends PlayPlugin
     try {
       if (driver != null) Class.forName(driver);
     } catch (ClassNotFoundException e) {
-      Logger.error("Database driver not found(%s). Virtual host in '%s' not loaded", driver, home);
+      Logger.error("Database driver not found(%s). Virtual host in '%s' not loaded", driver, vHostFilename);
       return;
     }
 
@@ -234,7 +257,7 @@ public class VirtualHostsPlugin extends PlayPlugin
 
     final String dbUrl = (String) vHostConfig.get("db.url", null);
     if (dbUrl == null) {
-      host = new VirtualHost(home, fqdns, vHostConfig, null);
+      host = new VirtualHost(fqdnList, vHostConfig, null);
     } else {
       System.setProperty("com.mchange.v2.log.MLog", "com.mchange.v2.log.FallbackMLog");
       System.setProperty("com.mchange.v2.log.FallbackMLog.DEFAULT_CUTOFF_LEVEL", "OFF");
@@ -248,7 +271,7 @@ public class VirtualHostsPlugin extends PlayPlugin
       cpds.setAutoCommitOnClose(true);
       cpds.setAcquireRetryAttempts(1);
       cpds.setAcquireRetryDelay(0);
-      host = new VirtualHost(home, fqdns, vHostConfig, new VirtualHostDataSource(cpds));
+      host = new VirtualHost(fqdnList, vHostConfig, cpds);
     }
 
     synchronized (this) {
