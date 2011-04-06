@@ -142,6 +142,8 @@ public class VirtualHostsPlugin extends PlayPlugin
   {
     if (!VirtualHostsPlugin.isEnabled()) return;
     Request currentRequest = Http.Request.current();
+    if (currentRequest == null) return;
+    
     VirtualHost host = findHost(currentRequest.domain) ;
     if (host == null) throw new NotFound("");
 
