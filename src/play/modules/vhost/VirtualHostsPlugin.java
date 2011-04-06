@@ -145,10 +145,12 @@ public class VirtualHostsPlugin extends PlayPlugin
     if (currentRequest == null || currentRequest.domain == null) return;
     
     VirtualHost host = findHost(currentRequest.domain);
-    if (host == null && !currentRequest.domain.equals("localhost")) throw new NotFound("");
-
+    if (host == null) {
+      if (!currentRequest.domain.equals("localhost")) throw new NotFound("");
+      return;
+    }
+    
     currentRequest.args.putAll(host.config);
-
     Map<String, DataSource> dataSources = new HashMap<String, DataSource>();
     if (host.getDataSource() != null) {
       dataSources.put(host.getName(), host.getDataSource());
