@@ -22,6 +22,9 @@ import play.mvc.Http;
 import play.mvc.Http.Request;
 import play.mvc.Http.Response;
 import play.mvc.results.NotFound;
+import play.templates.BaseTemplate;
+import play.templates.GroovyTemplateCompiler;
+import play.templates.Template;
 import play.utils.Properties;
 import play.vfs.VirtualFile;
 
@@ -118,47 +121,6 @@ public class VirtualHostsPlugin extends PlayPlugin
   }
 
   @Override
-  public boolean serveStatic(VirtualFile file, Request request, Response response)
-  {
-    VirtualHost host = findHost(request.domain);
-    if (host == null) return false;
-    
-    String publicDir = host.getConfigProperty("publicDir",null);
-    if (publicDir == null) return false;
-    
-    String f = file.relativePath();
-    if (f.startsWith("{")) f = f.substring(f.indexOf('}') + 1);
-    VirtualFile vfile = VirtualFile.open(publicDir).child(f);
-    if (!vfile.exists()) return false;
-
-    response.contentType = MimeTypes.getContentType(vfile.getName());
-    response.status = 200;
-    response.direct = vfile.getRealFile();
-    return true;
-  }
-
-  @Override
-  public void beforeInvocation()
-  {
-    if (!VirtualHostsPlugin.isEnabled()) return;
-    Request currentRequest = Http.Request.current();
-    if (currentRequest == null || currentRequest.domain == null) return;
-    
-    VirtualHost host = findHost(currentRequest.domain);
-    if (host == null) {
-      if (!currentRequest.domain.equals("localhost")) throw new NotFound("");
-      return;
-    }
-    
-    currentRequest.args.putAll(host.config);
-    Map<String, DataSource> dataSources = new HashMap<String, DataSource>();
-    if (host.getDataSource() != null) {
-      dataSources.put(host.getName(), host.getDataSource());
-    }
-    currentRequest.args.put("dataSources", dataSources);
-  }
-
-  @Override
   public void onApplicationStop()
   {
     if (notificationWatch != null) {
@@ -170,6 +132,85 @@ public class VirtualHostsPlugin extends PlayPlugin
         Logger.error(t.getMessage());
       }
     }
+  }
+
+  @Override
+  public Template loadTemplate(VirtualFile file)
+  {
+    Request currentRequest = Request.current();
+    if (currentRequest == null || currentRequest.domain == null) return null;
+
+    VirtualHost host = findHost(currentRequest.domain);
+    if (host == null) return null;
+
+    String filename = relativeFilename(file);
+    VirtualFile vfile = findReplacement(filename, host);
+    if (vfile == null || !vfile.exists()) return null;
+
+    BaseTemplate result = null;
+    synchronized (host.templateCache) {
+      result = host.templateCache.get(filename);
+      if (result == null || (Play.mode == Play.Mode.DEV && result.timestamp < vfile.lastModified())) {
+        Logger.debug("VHost: Override template '%s' with '%s'", filename,vfile.getRealFile().getAbsolutePath());
+        result = new GroovyTemplateCompiler().compile(vfile);
+        host.templateCache.put(filename, result);
+      }
+    }
+    return result;
+  }
+
+  @Override
+  public boolean serveStatic(VirtualFile file, Request request, Response response)
+  {
+    VirtualHost host = findHost(request.domain);
+    if (host == null) return false;
+
+    VirtualFile vfile = findReplacement(relativeFilename(file), host);
+    if (vfile == null || !vfile.exists()) return false;
+
+    Logger.debug("VHost: replace file '%s' with '%s'", relativeFilename(file),vfile.getRealFile().getAbsolutePath());
+    response.contentType = MimeTypes.getContentType(vfile.getName());
+    response.status = 200;
+    response.direct = vfile.getRealFile();
+    return true;
+  }
+
+  private String relativeFilename(VirtualFile file)
+  {
+    String result = file.relativePath();
+    if (result.startsWith("{")) result = result.substring(result.indexOf('}') + 1);
+
+    return result;
+  }
+
+  private VirtualFile findReplacement(String file, VirtualHost host)
+  {
+    String home = host.config(VirtualHost.CFG_HOME_DIR, null);
+    if (home == null) return null;
+    if (!home.startsWith("/")) home = Play.applicationPath + "/" + home;
+
+    return VirtualFile.open(home).child(file);
+  }
+
+  @Override
+  public void beforeInvocation()
+  {
+    if (!VirtualHostsPlugin.isEnabled()) return;
+    Request currentRequest = Http.Request.current();
+    if (currentRequest == null || currentRequest.domain == null) return;
+
+    VirtualHost host = findHost(currentRequest.domain);
+    if (host == null) {
+      if (!currentRequest.domain.equals("localhost")) throw new NotFound("");
+      return;
+    }
+
+    currentRequest.args.putAll(host.config);
+    Map<String, DataSource> dataSources = new HashMap<String, DataSource>();
+    if (host.getDataSource() != null) {
+      dataSources.put(host.getName(), host.getDataSource());
+    }
+    currentRequest.args.put("dataSources", dataSources);
   }
 
   static VirtualHost findHost(String domain)

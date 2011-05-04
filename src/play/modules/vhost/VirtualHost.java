@@ -8,16 +8,19 @@ import java.util.Set;
 
 import javax.sql.DataSource;
 
-import play.cache.Cache;
 import play.mvc.Http;
 import play.mvc.Http.Request;
+import play.templates.BaseTemplate;
 
 public class VirtualHost
 {
+  final static String         CFG_HOME_DIR = "homedir";
+
   private List<String>        fqdns;
   private DataSource          dataSource;
-  Map<String, String>         config;
   private Map<String, Object> properties;
+  Map<String, String>         config;
+  Map<String, BaseTemplate>   templateCache;
   Set<VirtualHostListener>    listeners;
 
   static public VirtualHost current()
@@ -43,8 +46,11 @@ public class VirtualHost
     properties = new HashMap<String, Object>();
     config = new HashMap<String, String>();
     listeners = new HashSet<VirtualHostListener>();
+    templateCache = new HashMap<String, BaseTemplate>();
     for (String key : pConfig.keySet()) {
-      if (!(key.equals("fqdn") || key.startsWith("db."))) config.putAll(pConfig);
+      if (!key.toLowerCase().equals("fqdns") && !key.toLowerCase().startsWith("db.")) {
+        config.put(key.toLowerCase(), pConfig.get(key));
+      }
     }
     this.dataSource = ds;
   }
@@ -57,12 +63,6 @@ public class VirtualHost
   public List<String> getFqdns()
   {
     return fqdns;
-  }
-
-  public String getConfigProperty(String pName, String pDefault)
-  {
-    String result = config.get(pName);
-    return result != null ? result : pDefault;
   }
 
   public Object getProperty(String pName)
@@ -90,14 +90,10 @@ public class VirtualHost
     return dataSource;
   }
 
-  public String cacheKey(String pKey)
+  String config(String pName, String pDefault)
   {
-    return String.format("%d:%s", fqdns.get(0).hashCode(), pKey);
+    String result = config.get(pName);
+    return result != null ? result : pDefault;
   }
-
-  public <T> T cacheGet(String pKey, Class<T> pClass)
-  {
-    return Cache.get(cacheKey(pKey), pClass);
-  }
-
+  
 }
