@@ -151,7 +151,7 @@ public class VirtualHostsPlugin extends PlayPlugin
     synchronized (host.templateCache) {
       result = host.templateCache.get(filename);
       if (result == null || (Play.mode == Play.Mode.DEV && result.timestamp < vfile.lastModified())) {
-        Logger.debug("VHost: Override template '%s' with '%s'", filename,vfile.getRealFile().getAbsolutePath());
+        Logger.debug("VHOST: Override template '%s' with '%s'", filename,vfile.getRealFile().getAbsolutePath());
         result = new GroovyTemplateCompiler().compile(vfile);
         host.templateCache.put(filename, result);
       }
@@ -168,7 +168,7 @@ public class VirtualHostsPlugin extends PlayPlugin
     VirtualFile vfile = findReplacement(relativeFilename(file), host);
     if (vfile == null || !vfile.exists()) return false;
 
-    Logger.debug("VHost: replace file '%s' with '%s'", relativeFilename(file),vfile.getRealFile().getAbsolutePath());
+    Logger.debug("VHOST: Replaced file '%s' with '%s'", relativeFilename(file),vfile.getRealFile().getAbsolutePath());
     response.contentType = MimeTypes.getContentType(vfile.getName());
     response.status = 200;
     response.direct = vfile.getRealFile();

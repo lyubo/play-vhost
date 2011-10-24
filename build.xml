@@ -1,6 +1,6 @@
 <project name="Play! Virtual Host Module Builder" default="dist" basedir=".">
 
-	<property name="version" value="1.0.2"/>
+	<property name="version" value="1.0.3"/>
 	
 	<target name="dist" depends="clean,compile">
         <jar jarfile="${basedir}/lib/play-vhost.jar" basedir="${basedir}/tmp"/>
