@@ -10,6 +10,7 @@
             <fileset dir="${basedir}">
               <include name="lib/*"/>
               <include name="src/**"/>
+              <include name="documentation/**"/>
             </fileset>
             <fileset dir="${basedir}/tmp">
               <include name="manifest"/>
