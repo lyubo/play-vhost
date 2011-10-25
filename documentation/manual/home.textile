@@ -1,0 +1,65 @@
+h1. play-vhost
+
+play-vhost module adds ability to write applications which can serve content based
+on HTTP/1.1 Host header field. Separate data source is maintained for each virtual host.
+Also all static resource requests are intercepted and per-host content is served if one exists.
+Configuration of name servers' A/CNAME records is not handled by the module.
+
+h2. Getting started
+
+Configuration
+-------------
+# Install the vhost module
+# add 'module.vhost=${play.path}/modules/vhost' in application.conf file 
+# Create or modify conf/play.plugins file and put a line for activating plugin (XX:play.modules.vhost.VirtualHostsPlugin)
+# Create virtual host configuration files. By default these files reside in "conf" directory.
+   You can specify another location by setting "virtualhosts.dir" parameter in conf/application.conf
+   File name must have ".vhost" extension.
+
+Virtual Host configuration file is a text file. It can hold the following parameters:   
+
+fqdns={comma-separated-list}
+Mandatory. A list with virtual host's fully qualified domain names.
+
+Example: fqdns=vhost1,localhost
+
+home={path}
+Optional. Here one can place virtual host specific files. For example custom templates or staticaly served files.
+
+Example: /var/www/vhost1 
+
+
+db.url={jdbc-data-source}
+Optional. Defines private virtual host JDBC data source. You have to omit "jdbc:" prefix.
+
+Example: db.url=mysql://localhost/vhost1?useUnicode=true&characterEncoding=UTF-8
+
+db.user={db-user}
+Optional. Username to be used when connecting to the data source defined with db.url
+
+db.password={password}
+Optional. Password to be used when connecting to the data source defined with db.url
+
+This file can contain any other configuration parameters which can be accessed via VirtualHost's config() method.
+
+_Note: You have to make appropriate changes in your dns servers, responsible for domains hosted in your application. Alternatively (which of course will work locally only) you can modify your os' hosts file._
+
+
+h2. Usage
+
+In any controller you can call static method VirtualHost.current(). This method takes "Host" request header field and tries to find a virtual host with that name. If such virtual host is defined a VirtualHost object is returned. 
+Alternatively when no request context is available you can call VirtualHost.find(name). Also VirtualHost.getAll() which returns an array of all defined virtual hosts.
+
+Once you have a VirtualHost object you can:
+* examine virtualhost's fqdns via getName(), getFqdns() methods
+* Invoke its getDataSource() to get virtualhost's private data source.
+* Add/remove/query virtual host's properties via setProperty(), clearProperty(), getProperty() methods.
+* Examine configuration parameters via config() method.
+* Add a listener via addListener() method. The listener is called back when a virtual host is unloaded.
+
+
+h2. JNotify
+
+This module uses external library _JNotify_ for notification of file changes in order to update virtual host configurations dynamically.
+It is a multi-platform library, currently running on  both Linux and Windows. You have to setup _java.library.path_ variable to point to libary's binary files. This library is not required for module to work. The only part which will not function is dinamyc updates of virtual hosts when a configuration file is added/changed/removed. In such case the application has to be restarted.
+
