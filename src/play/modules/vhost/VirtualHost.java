@@ -90,7 +90,7 @@ public class VirtualHost
     return dataSource;
   }
 
-  String config(String pName, String pDefault)
+  public String config(String pName, String pDefault)
   {
     String result = config.get(pName);
     return result != null ? result : pDefault;

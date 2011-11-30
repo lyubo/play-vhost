@@ -7,8 +7,6 @@ Configuration of name servers' A/CNAME records is not handled by the module.
 
 h2. Getting started
 
-Configuration
--------------
 # Install the vhost module
 # add 'module.vhost=${play.path}/modules/vhost' in application.conf file 
 # Create or modify conf/play.plugins file and put a line for activating plugin (XX:play.modules.vhost.VirtualHostsPlugin)
