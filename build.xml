@@ -1,9 +1,10 @@
 <project name="Play! Virtual Host Module Builder" default="dist" basedir=".">
 
-	<property name="version" value="1.0.4"/>
-	
+	<property name="version" value="1.0.5"/>
+	<property name="play.home" value="/usr/local/play" />
+
 	<target name="dist" depends="clean,compile">
-        <jar jarfile="${basedir}/lib/play-vhost.jar" basedir="${basedir}/tmp"/>
+        <jar jarfile="${basedir}/lib/play-vhost-${version}.jar" basedir="${basedir}/tmp"/>
 		<echo file="${basedir}/tmp/manifest" message="version=${version}${line.separator}frameworkVersions=1.1"/>
         <mkdir dir="${basedir}/dist"/>
         <zip destfile="${basedir}/dist/vhost-${version}.zip">
@@ -31,7 +32,7 @@
             <fileset dir="lib">
               <include name="**/*.jar"/>
             </fileset>
-            <fileset dir="/usr/local/play/framework">
+            <fileset dir="${play.home}/framework">
               <include name="**/*.jar"/>
             </fileset>          	
           </classpath>
