@@ -17,6 +17,7 @@ import net.contentobjects.jnotify.JNotifyListener;
 import play.Logger;
 import play.Play;
 import play.PlayPlugin;
+import play.i18n.Lang;
 import play.libs.MimeTypes;
 import play.mvc.Http;
 import play.mvc.Http.Request;
@@ -203,6 +204,12 @@ public class VirtualHostsPlugin extends PlayPlugin
     if (host == null) {
       if (!currentRequest.domain.equals("localhost")) throw new NotFound("");
       return;
+    }
+
+    // Fix request language if virtual host supports only a subset of application languages
+    if (!host.langs.isEmpty() && !host.langs.contains(Lang.get())) {
+      if (Logger.isDebugEnabled()) Logger.debug("VHOST: Override request language '%s' with '%s'", Lang.get(),host.langs.get(0));
+      Lang.set(host.langs.get(0));
     }
 
     currentRequest.args.putAll(host.config);

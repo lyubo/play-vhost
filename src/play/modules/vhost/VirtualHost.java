@@ -2,12 +2,15 @@ package play.modules.vhost;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import javax.sql.DataSource;
 
+import play.Play;
 import play.mvc.Http;
 import play.mvc.Http.Request;
 import play.templates.BaseTemplate;
@@ -22,6 +25,7 @@ public class VirtualHost
   Map<String, String>         config;
   Map<String, BaseTemplate>   templateCache;
   Set<VirtualHostListener>    listeners;
+  List<String>                langs;
 
   static public VirtualHost current()
   {
@@ -47,6 +51,8 @@ public class VirtualHost
     config = new HashMap<String, String>();
     listeners = new HashSet<VirtualHostListener>();
     templateCache = new HashMap<String, BaseTemplate>();
+    langs = new ArrayList<String>(pConfig.containsKey("application.langs") ? Arrays.asList(pConfig.get("application.langs").split(",")) : Play.langs);
+
     for (String key : pConfig.keySet()) {
       if (!key.toLowerCase().equals("fqdns") && !key.toLowerCase().startsWith("db.")) {
         config.put(key.toLowerCase(), pConfig.get(key));
